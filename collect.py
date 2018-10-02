@@ -2,15 +2,15 @@ import geopy.distance
 import requests
 import os
 import time
+import pytz
 import datetime as dt
 
 STATION_INFO_URL = "https://gbfs.citibikenyc.com/gbfs/en/station_information.json"
 STATION_STATUS_URL = "https://gbfs.citibikenyc.com/gbfs/en/station_status.json"
-#MY_COORDS = 
+#MY_COORDS =
 DIST_THRESH_KM = 0.3
 
-OUTPUT_FOLDER = './output'
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+OUTPUT_FILE = './output.csv'
 
 stations_info = requests.get(STATION_INFO_URL).json()['data']['stations']
 
@@ -18,14 +18,21 @@ stations_info = requests.get(STATION_INFO_URL).json()['data']['stations']
     # geopy.distance.geodesic((s['lat'], s['lon']), MY_COORDS) < DIST_THRESH_KM}
 station_subset = {s['station_id'] for s in stations_info}
 
+fields = ['station_id', 'num_bikes_available', 'num_docks_available', 'last_reported']
+
+if not os.path.exists(OUTPUT_FILE):
+    with open(OUTPUT_FILE, 'w') as f:
+        f.write(','.join(['timestamp'] + fields) + '\n')
+
 while True:
-    print(dt.datetime.now())
+    wakeup = dt.datetime.now(pytz.utc)
+
     stations_status = requests.get(STATION_STATUS_URL).json()['data']['stations']
 
-    for s in stations_status:
-        sid = s['station_id']
-        if sid in station_subset:
-            with open(os.path.join(OUTPUT_FOLDER, sid + '.csv'), 'a') as f:
-                f.write('{},{}\n'.format(s['last_reported'], s['num_bikes_available']))
+    with open(OUTPUT_FILE, 'a') as f:
+        for s in stations_status:
+            f.write('{},'.format(wakeup))
+            f.write(','.join(str(s[f]) for f in fields))
+            f.write('\n')
 
-    time.sleep(5)
+    time.sleep(15)
